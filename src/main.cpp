@@ -4,149 +4,150 @@
 #include <WiFiUdp.h>
 #include <Button.h>
 #include <Joystick.h>
-#include <Controller.h>
-#include <sstream>
-using namespace std;
+#include <Led.h>
+#include <LiquidCrystal_I2C.h>
+
+//using namespace std;
 
 bool isCommandSent = false;
 bool isflying = false;
-bool Debug = true;
-string commandResponse;
-int speedx = 0 ;
-int speedy = 0 ;
+bool canMoveMode = false;
+bool debug = true;
 
-
-WifiCon drone;
 Button TakeoOffButton(23);
 Button landButton(3);
-Joystick MoveJoystik(5, 4, 2, 3725,2935, 10);
-Joystick rotateJoystik(34,36, 39, 4100, 4100, 37);
+Button flightModeButton(5);
+Button menuToggleLcd(4);
+Joystick MoveJoystik(34,39,36,45);
+Led LedGren(18);
+Led LedYellow(19);
+Led LedRed(16);
+
 
 
 byte LCD_COL = 2;
 byte LCD_ROW = 16;
-
 long previusDelayBattery;
-long interval = 6000;
+long interval = 1000;
+int arrayIndex = 0;
+int stepIndex = 0;
 
 LiquidCrystal_I2C lcd(0x3F, LCD_COL, LCD_ROW); //class instatiate 0x27 0x3F
+WifiCon drone("TELLO-FE2F25","", debug);
 
 void setup()
 {
-  // Initilize hardware serial:
   Serial.begin(9600);
-  lcd.init();                      // initialize the lcd 
+  lcd.init();                     
   lcd.backlight();
- // lcd.blink_off();  
-
-  if (Debug == false)
-  {
-    drone.connect("TELLO-FE2F25", "");
-  }
+  drone.connect();
+  drone.setIp ("192.168.10.1");
+  
 }
 
 void loop()
 {
-  unsigned long currentdelay = millis();
-  //lcd.blink_off(); 
+ unsigned long currentdelay = millis();
+ LedGren.IsOn(canMoveMode);
+ LedYellow.IsOn(!canMoveMode);
+ LedRed.IsOn(!isflying);
  
-  lcd.setCursor(0,0);
+ 
+ 
+
+
+  if ((currentdelay - previusDelayBattery) > interval && isCommandSent == true )
+      {
+        previusDelayBattery = currentdelay;
+        lcd.clear();
+        lcd.setCursor(0,0);
+        lcd.print(drone.connectedStatus.c_str()); 
+        lcd.setCursor(0,1);
+        lcd.print(drone.telemetry[arrayIndex].c_str());       
+      }
+      else
+      {
+        
+        lcd.setCursor(0,0);
+        lcd.print(drone.connectedStatus.c_str()); 
+      }
+      
+     
     
-
+  
+  
   //only send data when drone is connected to wifi
-  if (drone.connected || Debug == true)
-  {
-
+  if (drone.connected || debug == true)
+  {       
     if (isCommandSent == false)
     {
-      drone.sendCommand("command", Debug);
-
-      
-      if("ok" == drone.getResponse(Debug) || Debug == true)
+      drone.sendCommand("command");
+      string rdy = drone.getResponse(); 
+      if(rdy == "ok")
       {
         isCommandSent = true;
-      }
-    }
-    else
-    {
-           
-      if ((currentdelay - previusDelayBattery) > interval)
-      { 
-        previusDelayBattery = currentdelay;
-      
-        drone.sendCommand("battery?", Debug);
-        string battery = drone.getResponse(Debug);
-        
-        lcd.clear(); 
+        lcd.clear();        
         lcd.setCursor(0,0);
-        lcd.print("connected");
-        lcd.setCursor(0,1);
-        lcd.print("battery");
-        lcd.setCursor(8,1);
-        lcd.print(battery.c_str());
+        lcd.print("ready");
+        Serial.println("ready");      
+      }      
+    }
+    else if(isCommandSent == true)
+    {   
+
+      if (menuToggleLcd.buttonIspressed())// cycle arrayIndex int
+      {
+        if (arrayIndex >= 2)
+        {
+          arrayIndex = 0;
+        }
+        else
+        {
+          arrayIndex++;
+        }                     
+        Serial.println(arrayIndex);
       }
+   
+      if ((MoveJoystik.getSpeedAxisX() != 0 || MoveJoystik.getSpeedAxisY() != 0) && isflying == true)// check if ps2 joystick is pushed
+      {
+       
+        if (canMoveMode == true) //send rc command input based on flightmode
+        {
+          drone.sendRcCommand(MoveJoystik.getSpeedAxisX(),MoveJoystik.getSpeedAxisY(),0,0);
+        }
+        else
+        {
+          drone.sendRcCommand(0,0,MoveJoystik.getSpeedAxisX(),MoveJoystik.getSpeedAxisY());
+        }
+      }
+      else if(isflying == true)// if no ps2 joystick is detected send Rc command with 0 values to keep drone in place
+      {
+         drone.sendCommand("rc 0 0 0 0");
+      }
+
+
+      if (flightModeButton.buttonIspressed())
+        {
+          Serial.println("flightModeButton");
+          canMoveMode = !canMoveMode;
+        }
       
-      
+   
+      if (landButton.buttonIspressed())
+        {
+           drone.sendCommand("land");
+          isflying = false;
+        }
 
-
-      if ((MoveJoystik.getSpeedAxis(0) != 0 || MoveJoystik.getSpeedAxis(1) != 0 || rotateJoystik.getSpeedAxis(0) != 0 || rotateJoystik.getSpeedAxis(1) != 0) && (isflying == true || Debug == true))
-    {
-       speedx = MoveJoystik.getSpeedAxis(0);
-       speedy = MoveJoystik.getSpeedAxis(1);
-
-       int speedz = rotateJoystik.getSpeedAxis(0); 
-       int speede = rotateJoystik.getSpeedAxis(1);
-/*
-      ostringstream s;
-      s << "rc " << speedy << " " << speedx << " 0 0";
-      string command = s.str();
-      
-
-     Serial.println(command.c_str());
-     drone.sendCommand(command, Debug);
-*/
-     drone.sendRcCommand(speedy,speedx, speedz, speede, Debug) ;
+      if (TakeoOffButton.buttonIspressed())
+        {
+          drone.sendCommand("takeoff");
+          isflying = true;
+        }
     }
-    else
-    {
-       //drone.sendCommand("stop", Debug);
-    }
-
-    if (TakeoOffButton.buttonIspressed())
-    {
-       Serial.println("TakeoOffButtonpressed");
-       drone.sendCommand("takeoff", Debug);
-      // drone.sendCommand("stop", Debug);
-      isflying = true;
-    }
-    else
-    {
-      //Serial.println("NOTpressedTakeoOffButton");
-    }
-
-    if (landButton.buttonIspressed())
-    {
-       Serial.println("landButtonpressed");
-       drone.sendCommand("land", Debug);
-      // drone.sendCommand("stop", Debug);
-      isflying = false;
-    }
-    else
-    {
-      //Serial.println("NOTpressedlandButton");
-    }
-    }    
-    
   }
   else
-  {
-    
-    lcd.setCursor(0,0);
-    lcd.print("No connection");
-    
-  }
-  
-  
-   
-  
+  {     
+    isCommandSent = false;      
+  }  
 }

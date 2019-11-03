@@ -1,6 +1,7 @@
 #include <WiFi.h>
 #include <WiFiUdp.h>
 #include <string.h>
+#include "AsyncUDP.h"
 
 using namespace std;
 
@@ -8,24 +9,32 @@ using namespace std;
 class WifiCon
 {
     public:
-        boolean connected;
-        WifiCon();
-        string sendMessage(string message);
-        void printWifiStatus(); 
-        void connect(const char* ssid, const char* password);
-        void sendCommand(string message, bool debug);
-        string getResponse(bool debug);
-        void sendRcCommand(int a,int b, int c, int d,bool debug);  
-        const char* networkName;
-        const char* networkPswd;
+        string telemetry[3]; // array containing flight data       
+        bool debug; // set debug mode
+        boolean connected; //bool for state of connection
+        string connectedStatus;//string for feedback on connection status       
+        WifiCon(String ssid, String password, bool debug); //constructor setuo credentials
+        String myIp; //ip ig my unit              
+        void connect();// for connecting to drono wifi
+        void sendCommand(string message); // seding commands to drone
+        void sendRcCommand(int a,int b, int c, int d); // sending RC command to drone
+        void commandResponse(String response); // asynch UDP response port 8890
+        void setIp(String ip);
+        string getResponse(); // synch UDP response 9989
+        
 
 
     private:
-        //const char * networkName = "tello2";
-        //const char * networkPswd = "";'
-        void WiFiEvent(WiFiEvent_t event, system_event_info_t info);
-        WiFiUDP udp;
-        const char * udpAddress = "192.168.10.1";
-        const int udpPort = 8889;  
+        String ssid; // id of wifi
+        String password; //pass of wifi
+        WiFiUDP udpSender; //wifi connection class
+        const int udpPort = 8889;//ports of repsonse 
+        const int asynchudpPort = 8890; //ports for listen
+        AsyncUDP udp; // class for handling asynch udp
+        String droneIp = "192.168.10.1"; 
+        void WiFiEvent(WiFiEvent_t event, system_event_info_t info); // part of eventhandler for getting connection state
+        string FilterData(string data, string find, int length);
+        void ClearTelemetry();
+        
 
 };

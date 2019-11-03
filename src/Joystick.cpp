@@ -1,59 +1,44 @@
 #include <Joystick.h>
 #include <Arduino.h>
 
-Joystick::Joystick(byte ButtonPin, byte XPin, byte YPin, int xCalibrate, int yCalibrate, int deadZone)
+Joystick::Joystick(byte ButtonPin, byte XPin, byte YPin, int deadZone)
 {
     this->ButtonPin = ButtonPin;
     this->XPin = XPin;
     this->YPin = YPin;
-    this->xCalibrate = xCalibrate;
-    this->yCalibrate = yCalibrate;
     this->deadZone = deadZone;
     init();
 }
 
 void Joystick::init()
 {
-    pinMode(ButtonPin, INPUT);
+    pinMode(this->ButtonPin, INPUT);
+}
+
+
+int Joystick::getSpeedAxisX()
+{
+     int speed = 0;
+     int XmapSpeed = map(analogRead(this->XPin), 0, 4095, -100, 100); //3725
+     speed = Deadzonecal(XmapSpeed);
+     return speed;
+
+}
+
+int Joystick::getSpeedAxisY()
+{
+     int speed = 0;
+     int YmapSpeed = map(analogRead(this->YPin),4095, 0, -100, 100); //3725
+     speed = Deadzonecal(YmapSpeed);
+     return speed;
+
 }
 
 
 
-
-
-int Joystick::getSpeedAxis(int axis) // 0 = X axis     1= Y axis
+int Joystick::Deadzonecal(int mapspeed)
 {
-    int speed = 0;
-
-    if (axis == 0)
-    {
-        XmapSpeed = map(analogRead(XPin), 0, xCalibrate, -100, 100); //3725
-        speed = mappedSpeed(XmapSpeed);
-    }
-    else if (axis == 1)
-    {
-        YmapSpeed = map(analogRead(YPin), yCalibrate, 0, -100, 100); //4095 2935
-        speed = mappedSpeed(YmapSpeed);
-    }
-
-    if(speed > 100)
-    {
-        speed = 100;
-    }
-
-    if(speed < -100)
-    {
-          speed = -100;
-    }
-
-   
-
-    return speed;
-}
-
-int Joystick::mappedSpeed(int mapspeed)
-{
-    if (mapspeed > deadZone || mapspeed < -deadZone) /// callibriation deadzone
+    if (mapspeed > this->deadZone || mapspeed < this->deadZone*-1) /// callibriation deadzone
     {
         return mapspeed;
     }
