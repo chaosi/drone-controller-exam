@@ -144,6 +144,12 @@ void loop()
           drone.sendCommand("takeoff");
           isflying = true;
         }
+
+      if (MoveJoystik.buttonIspressed())
+        {
+          drone.sendCommand("flip b");
+          isflying = true;
+        }
     }
   }
   else

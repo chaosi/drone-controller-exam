@@ -2,7 +2,7 @@
 #include <Led.h>
 
 
-Led::Led(byte pin)
+Led::Led(int pin)
     {
      this->pin = pin;
      init();

@@ -7,14 +7,14 @@
 class Led
 {
     private:
-    byte pin;
+    int pin;
     void init();
               
 
        
         
     public:
-    Led(byte pin);
+    Led(int pin);
     void IsOn(bool state);
   
         
